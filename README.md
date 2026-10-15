@@ -102,9 +102,9 @@ La pantalla inicial ofrece dos accesos:
 - **Administrador:** solo permite iniciar sesión; la cuenta debe tener el rol `admin`.
 - **Cliente:** permite iniciar sesión o registrarse. El registro público siempre crea un cliente.
 
-Después de verificar el rol, el panel Cliente permite editar el nombre para mostrar. El panel Admin muestra la lista de clientes y permite activar o desactivar cuentas.
+Después de verificar el rol, el administrador tiene secciones de resumen, productos, entradas y salidas, movimientos y clientes. Puede crear productos, actualizar su información, registrar ajustes de stock y eliminar productos del catálogo. La eliminación es lógica (desactivación) para conservar el historial de ventas y movimientos; los productos se pueden restaurar.
 
-El panel Admin también administra el catálogo y el inventario. En el panel Cliente se muestran el catálogo disponible y las últimas diez compras; comprar registra de inmediato el pedido y descuenta una unidad del stock, sin cobro en línea.
+El cliente tiene secciones de productos, carrito, compras e información de perfil. Puede agregar varios productos y cantidades al carrito, ajustar o quitar artículos y confirmar el pedido. La compra descuenta el stock de forma transaccional y no procesa cobros en línea. El carrito permanece en la sesión actual del navegador; los pedidos confirmados se guardan en Supabase.
 
 ## Compilar
 

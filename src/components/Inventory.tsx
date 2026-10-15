@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import { supabase } from '../lib/supabase'
 
 type Product = {
@@ -26,6 +27,9 @@ type PurchaseOrder = {
 }
 
 type InventoryMovement = 'entry' | 'exit'
+type AdminInventorySection = 'overview' | 'products' | 'stock' | 'movements'
+type ClientStoreSection = 'catalog' | 'cart' | 'orders'
+type CartItem = { product: Product; quantity: number }
 type MovementRow = {
   id: string
   movement_type: 'entry' | 'exit' | 'sale'
@@ -40,7 +44,11 @@ const currency = new Intl.NumberFormat('es-MX', {
   currency: 'MXN',
 })
 
-export function AdminInventory() {
+export function AdminInventory({
+  section,
+}: {
+  section: AdminInventorySection
+}) {
   const [products, setProducts] = useState<Product[]>([])
   const [movements, setMovements] = useState<MovementRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -194,7 +202,6 @@ export function AdminInventory() {
           })
           .eq('id', editingProductId)
         if (error) throw error
-        if (error) throw error
       } else {
         const { error } = await supabase.rpc('create_product', {
           p_sku: sku.trim(),
@@ -226,6 +233,14 @@ export function AdminInventory() {
 
   async function toggleProduct(product: Product) {
     if (!supabase) return
+    if (
+      product.is_active &&
+      !window.confirm(
+        `¿Eliminar ${product.name} del catálogo? Se conservará el historial y podrás reactivarlo después.`,
+      )
+    ) {
+      return
+    }
     setErrorMessage('')
     setNotice('')
     setSaving(true)
@@ -237,7 +252,7 @@ export function AdminInventory() {
 
       if (error) throw error
       const successMessage = product.is_active
-        ? 'El producto se ocultó del catálogo; su historial se conservó.'
+        ? 'El producto se eliminó del catálogo; su historial se conservó.'
         : 'El producto volvió a estar disponible en el catálogo.'
       setNotice(successMessage)
       try {
@@ -326,7 +341,24 @@ export function AdminInventory() {
       {errorMessage && <InventoryFeedback kind="error">{errorMessage}</InventoryFeedback>}
       {notice && <InventoryFeedback kind="success">{notice}</InventoryFeedback>}
 
-      <div className="inventory-layout">
+      {section === 'overview' && (
+        <div className="inventory-overview">
+          <article>
+            <span>Productos</span>
+            <strong>{products.length}</strong>
+          </article>
+          <article>
+            <span>Activos</span>
+            <strong>{products.filter((product) => product.is_active).length}</strong>
+          </article>
+          <article className={lowStockCount ? 'overview-warning' : ''}>
+            <span>Stock bajo</span>
+            <strong>{lowStockCount}</strong>
+          </article>
+        </div>
+      )}
+
+      {section === 'products' && <div className="inventory-layout">
         <form className="inventory-form" onSubmit={saveProduct}>
           <h4>{editingProductId ? 'Editar producto' : 'Agregar producto'}</h4>
           <label className="field">
@@ -476,7 +508,7 @@ export function AdminInventory() {
                       onClick={() => void toggleProduct(product)}
                       disabled={saving}
                     >
-                      {product.is_active ? 'Desactivar' : 'Activar'}
+                      {product.is_active ? 'Eliminar' : 'Restaurar'}
                     </button>
                   </div>
                 </article>
@@ -484,9 +516,9 @@ export function AdminInventory() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
-      <form className="movement-form" onSubmit={registerMovement}>
+      {section === 'stock' && <form className="movement-form" onSubmit={registerMovement}>
         <div>
           <p className="eyebrow">BITÁCORA DE STOCK</p>
           <h4>Registrar entrada o salida</h4>
@@ -547,21 +579,25 @@ export function AdminInventory() {
         >
           {saving ? 'Registrando…' : 'Registrar movimiento'}
         </button>
-      </form>
+      </form>}
 
-      <div className="movement-history">
+      {(section === 'overview' || section === 'movements') && <div className="movement-history">
         <div className="inventory-heading">
           <div>
             <p className="eyebrow">TRAZABILIDAD</p>
             <h4>Movimientos recientes</h4>
           </div>
-          <span>Últimos {movements.length} movimientos</span>
+          <span>
+            {section === 'overview'
+              ? `Últimos ${Math.min(movements.length, 5)} movimientos`
+              : `${movements.length} movimientos`}
+          </span>
         </div>
         {movements.length === 0 ? (
           <p className="table-message">Todavía no hay movimientos registrados.</p>
         ) : (
           <div className="movement-list">
-            {movements.map((movement) => {
+            {(section === 'overview' ? movements.slice(0, 5) : movements).map((movement) => {
               const product = movement.products[0]
               return (
                 <article className="movement-row" key={movement.id}>
@@ -588,14 +624,23 @@ export function AdminInventory() {
             })}
           </div>
         )}
-      </div>
+      </div>}
     </section>
   )
 }
 
-export function ClientStore({ clientId }: { clientId: string }) {
+export function ClientStore({
+  clientId,
+  section,
+  onCartCountChange,
+}: {
+  clientId: string
+  section: ClientStoreSection
+  onCartCountChange: Dispatch<SetStateAction<number>>
+}) {
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
+  const [cart, setCart] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
   const [buyingProductId, setBuyingProductId] = useState('')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
@@ -611,7 +656,6 @@ export function ClientStore({ clientId }: { clientId: string }) {
           'id, sku, name, description, price, stock_quantity, minimum_stock, is_active',
         )
         .eq('is_active', true)
-        .gt('stock_quantity', 0)
         .order('name'),
       supabase
         .from('orders')
@@ -640,7 +684,6 @@ export function ClientStore({ clientId }: { clientId: string }) {
               'id, sku, name, description, price, stock_quantity, minimum_stock, is_active',
             )
             .eq('is_active', true)
-            .gt('stock_quantity', 0)
             .order('name'),
           supabase
             .from('orders')
@@ -671,22 +714,110 @@ export function ClientStore({ clientId }: { clientId: string }) {
     }
   }, [clientId])
 
-  async function buy(product: Product) {
+  useEffect(() => {
+    onCartCountChange(
+      cart.reduce((count, item) => count + item.quantity, 0),
+    )
+  }, [cart, onCartCountChange])
+
+  function addToCart(product: Product, requestedQuantity: number) {
+    if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
+      setErrorMessage('Selecciona una cantidad válida.')
+      return
+    }
+    const currentQuantity =
+      cart.find((item) => item.product.id === product.id)?.quantity ?? 0
+    if (currentQuantity + requestedQuantity > product.stock_quantity) {
+      setErrorMessage('La cantidad supera las existencias disponibles.')
+      return
+    }
+    setErrorMessage('')
+    setNotice(`${product.name} se agregó al carrito.`)
+    setCart((current) => {
+      const existing = current.find((item) => item.product.id === product.id)
+      if (existing) {
+        return current.map((item) =>
+          item.product.id === product.id
+            ? { ...item, quantity: item.quantity + requestedQuantity }
+            : item,
+        )
+      }
+      return [...current, { product, quantity: requestedQuantity }]
+    })
+  }
+
+  function updateCartQuantity(productId: string, nextQuantity: number) {
+    const product = products.find((item) => item.id === productId)
+    if (!product) return
+    if (nextQuantity < 1) {
+      setCart((current) => current.filter((item) => item.product.id !== productId))
+      return
+    }
+    if (nextQuantity > product.stock_quantity) {
+      setErrorMessage('La cantidad supera las existencias disponibles.')
+      return
+    }
+    setCart((current) =>
+      current.map((item) =>
+        item.product.id === productId
+          ? { ...item, quantity: nextQuantity, product }
+          : item,
+      ),
+    )
+    setErrorMessage('')
+  }
+
+  async function checkout() {
     if (!supabase) return
     setErrorMessage('')
     setNotice('')
-    const quantity = quantities[product.id] ?? 1
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > product.stock_quantity) {
-      setErrorMessage('La cantidad debe estar entre 1 y las unidades disponibles.')
+    if (cart.length === 0) {
+      setErrorMessage('Agrega al menos un producto antes de confirmar la compra.')
       return
     }
-    setBuyingProductId(product.id)
+    const unavailableItem = cart.find(
+      (item) =>
+        !products.some(
+          (product) =>
+            product.id === item.product.id &&
+            product.stock_quantity >= item.quantity,
+        ),
+    )
+    if (unavailableItem) {
+      setErrorMessage(
+        `No hay existencias suficientes para ${unavailableItem.product.name}. Actualiza el carrito.`,
+      )
+      return
+    }
+
+    setBuyingProductId('checkout')
     try {
-      const { error } = await supabase.rpc('place_order', {
-        p_items: [{ product_id: product.id, quantity }],
+      const { data: orderId, error } = await supabase.rpc('place_order', {
+        p_items: cart.map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+        })),
       })
       if (error) throw error
-      setNotice(`Compra realizada: ${quantity} × ${product.name}.`)
+      setCart([])
+      setNotice('Compra realizada correctamente.')
+      if (orderId) {
+        const { data: savedOrder, error: orderError } = await supabase
+          .from('orders')
+          .select('total')
+          .eq('id', orderId)
+          .single()
+
+        if (orderError) {
+          setErrorMessage(
+            `La compra quedó registrada, pero no se pudo consultar el total final: ${errorText(orderError)}`,
+          )
+        } else {
+          setNotice(
+            `Compra realizada correctamente por ${currency.format(savedOrder.total)}.`,
+          )
+        }
+      }
       try {
         await loadStore()
       } catch (error) {
@@ -701,8 +832,23 @@ export function ClientStore({ clientId }: { clientId: string }) {
     }
   }
 
+  const cartTotal = cart.reduce(
+    (total, item) => total + item.product.price * item.quantity,
+    0,
+  )
+
   return (
-    <section className="store-section" aria-labelledby="store-title">
+    <section
+      className="store-section"
+      aria-labelledby={
+        section === 'catalog'
+          ? 'store-title'
+          : section === 'cart'
+            ? 'cart-title'
+            : 'orders-title'
+      }
+    >
+      {section === 'catalog' && <>
       <div className="inventory-heading">
         <div>
           <p className="eyebrow">CATÁLOGO DISPONIBLE</p>
@@ -723,7 +869,9 @@ export function ClientStore({ clientId }: { clientId: string }) {
               <h4>{product.name}</h4>
               {product.description && <p>{product.description}</p>}
               <span className="store-availability">
-                {product.stock_quantity} disponibles
+                {product.stock_quantity > 0
+                  ? `${product.stock_quantity} disponibles`
+                  : 'Agotado'}
               </span>
               <div className="store-purchase">
                 <strong>{currency.format(product.price)}</strong>
@@ -750,22 +898,93 @@ export function ClientStore({ clientId }: { clientId: string }) {
                 <button
                   className="primary-button"
                   type="button"
-                  onClick={() => void buy(product)}
-                  disabled={Boolean(buyingProductId)}
+                  onClick={() =>
+                    addToCart(product, quantities[product.id] ?? 1)
+                  }
+                  disabled={product.stock_quantity === 0 || Boolean(buyingProductId)}
                 >
-                  {buyingProductId === product.id ? 'Procesando…' : 'Comprar'}
+                  {product.stock_quantity === 0 ? 'Agotado' : 'Agregar'}
                 </button>
               </div>
             </article>
           ))}
         </div>
       )}
+      </>}
 
-      <div className="order-history">
+      {section === 'cart' && (
+        <div className="cart-section">
+          <div className="inventory-heading">
+            <div>
+              <p className="eyebrow">TU SELECCIÓN</p>
+              <h3 id="cart-title">Carrito de compras</h3>
+            </div>
+          </div>
+          {errorMessage && <InventoryFeedback kind="error">{errorMessage}</InventoryFeedback>}
+          {notice && <InventoryFeedback kind="success">{notice}</InventoryFeedback>}
+          {cart.length === 0 ? (
+            <p className="table-message">Tu carrito está vacío. Explora el catálogo para agregar productos.</p>
+          ) : (
+            <>
+              <div className="cart-list">
+                {cart.map((item) => (
+                  <article className="cart-row" key={item.product.id}>
+                    <div>
+                      <strong>{item.product.name}</strong>
+                      <span>{currency.format(item.product.price)} por unidad</span>
+                    </div>
+                    <label className="store-quantity">
+                      <span className="visually-hidden">
+                        Cantidad de {item.product.name}
+                      </span>
+                      <input
+                        aria-label={`Cantidad de ${item.product.name}`}
+                        type="number"
+                        min="1"
+                        max={item.product.stock_quantity}
+                        value={item.quantity}
+                        onChange={(event) =>
+                          updateCartQuantity(item.product.id, Number(event.target.value))
+                        }
+                        disabled={Boolean(buyingProductId)}
+                      />
+                    </label>
+                    <strong>
+                      {currency.format(item.product.price * item.quantity)}
+                    </strong>
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => updateCartQuantity(item.product.id, 0)}
+                      disabled={Boolean(buyingProductId)}
+                    >
+                      Quitar
+                    </button>
+                  </article>
+                ))}
+              </div>
+              <div className="cart-checkout">
+                <span>Total</span>
+                <strong>{currency.format(cartTotal)}</strong>
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => void checkout()}
+                  disabled={Boolean(buyingProductId)}
+                >
+                  {buyingProductId ? 'Procesando…' : 'Confirmar compra'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {section === 'orders' && <div className="order-history">
         <div className="inventory-heading">
           <div>
             <p className="eyebrow">ACTIVIDAD DE TU CUENTA</p>
-            <h3>Mis compras</h3>
+            <h3 id="orders-title">Mis compras</h3>
           </div>
         </div>
         {orders.length === 0 ? (
@@ -788,7 +1007,7 @@ export function ClientStore({ clientId }: { clientId: string }) {
             ))}
           </div>
         )}
-      </div>
+      </div>}
     </section>
   )
 }

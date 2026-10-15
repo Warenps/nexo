@@ -6,6 +6,8 @@ import './App.css'
 
 type AppRole = 'admin' | 'client'
 type AuthMode = 'sign-in' | 'sign-up'
+type AdminSection = 'overview' | 'products' | 'stock' | 'movements' | 'clients'
+type ClientSection = 'catalog' | 'cart' | 'orders' | 'profile'
 type Profile = {
   id: string
   display_name: string
@@ -705,6 +707,9 @@ function ClientDashboard({
   onSave: (event: FormEvent<HTMLFormElement>) => void
   onSignOut: () => void
 }) {
+  const [section, setSection] = useState<ClientSection>('catalog')
+  const [cartCount, setCartCount] = useState(0)
+
   return (
     <section className="dashboard" aria-labelledby="client-title">
       <DashboardHeader
@@ -712,41 +717,59 @@ function ClientDashboard({
         email={user?.email ?? ''}
         onSignOut={onSignOut}
       />
-      <p className="eyebrow">TU ESPACIO PERSONAL</p>
-      <h2 id="client-title">
-        {profile.display_name
-          ? `Hola, ${profile.display_name}`
-          : 'Completa tu perfil'}
-      </h2>
-      <p className="form-description">
-        Mantén actualizada la información básica de tu cuenta.
-      </p>
-      <form onSubmit={onSave}>
-        <label className="field">
-          <span>Nombre para mostrar</span>
-          <input
-            type="text"
-            name="display-name"
-            autoComplete="name"
-            maxLength={80}
-            placeholder="¿Cómo te llamamos?"
-            value={profileName}
-            onChange={(event) => setProfileName(event.target.value)}
-            required
-            disabled={busy}
-          />
-        </label>
-        <label className="field">
-          <span>Correo electrónico</span>
-          <input type="email" value={user?.email ?? ''} readOnly />
-        </label>
-        {errorMessage && <Feedback kind="error">{errorMessage}</Feedback>}
-        {notice && <Feedback kind="success">{notice}</Feedback>}
-        <button className="primary-button" type="submit" disabled={busy}>
-          {busy ? 'Guardando…' : 'Guardar perfil'}
-        </button>
-      </form>
-      <ClientStore clientId={clientId} />
+      <p className="eyebrow">HOLA, {profile.display_name || 'CLIENTE'}</p>
+      <h2 id="client-title">Tu espacio de compras</h2>
+      <DashboardNavigation
+        label="Secciones de cliente"
+        selected={section}
+        items={[
+          { id: 'catalog', label: 'Productos' },
+          { id: 'cart', label: `Carrito${cartCount ? ` (${cartCount})` : ''}` },
+          { id: 'orders', label: 'Mis compras' },
+          { id: 'profile', label: 'Mi perfil' },
+        ]}
+        onSelect={setSection}
+      />
+      {section === 'profile' ? (
+        <section className="profile-panel" aria-labelledby="profile-title">
+          <p className="eyebrow">TU ESPACIO PERSONAL</p>
+          <h3 id="profile-title">Mi perfil</h3>
+          <p className="form-description">
+            Mantén actualizada la información básica de tu cuenta.
+          </p>
+          <form onSubmit={onSave}>
+            <label className="field">
+              <span>Nombre para mostrar</span>
+              <input
+                type="text"
+                name="display-name"
+                autoComplete="name"
+                maxLength={80}
+                placeholder="¿Cómo te llamamos?"
+                value={profileName}
+                onChange={(event) => setProfileName(event.target.value)}
+                required
+                disabled={busy}
+              />
+            </label>
+            <label className="field">
+              <span>Correo electrónico</span>
+              <input type="email" value={user?.email ?? ''} readOnly />
+            </label>
+            {errorMessage && <Feedback kind="error">{errorMessage}</Feedback>}
+            {notice && <Feedback kind="success">{notice}</Feedback>}
+            <button className="primary-button" type="submit" disabled={busy}>
+              {busy ? 'Guardando…' : 'Guardar perfil'}
+            </button>
+          </form>
+        </section>
+      ) : (
+        <ClientStore
+          clientId={clientId}
+          section={section}
+          onCartCountChange={setCartCount}
+        />
+      )}
     </section>
   )
 }
@@ -770,6 +793,8 @@ function AdminDashboard({
   onChangeStatus: (client: ManagedClient) => void
   onSignOut: () => void
 }) {
+  const [section, setSection] = useState<AdminSection>('overview')
+
   return (
     <section className="dashboard admin-dashboard" aria-labelledby="admin-title">
       <DashboardHeader
@@ -777,10 +802,34 @@ function AdminDashboard({
         email={email}
         onSignOut={onSignOut}
       />
-      <AdminInventory />
-      <div className="admin-clients-section">
+      <p className="eyebrow">CENTRO DE CONTROL</p>
+      <h2 id="admin-title">Panel de administración</h2>
+      <DashboardNavigation
+        label="Secciones de administración"
+        selected={section}
+        items={[
+          { id: 'overview', label: 'Resumen' },
+          { id: 'products', label: 'Productos' },
+          { id: 'stock', label: 'Entradas y salidas' },
+          { id: 'movements', label: 'Movimientos' },
+          { id: 'clients', label: 'Clientes' },
+        ]}
+        onSelect={setSection}
+      />
+      {section !== 'clients' ? (
+        <AdminInventory
+          section={
+            section === 'products' ||
+            section === 'stock' ||
+            section === 'movements'
+              ? section
+              : 'overview'
+          }
+        />
+      ) : (
+        <div className="admin-clients-section">
         <p className="eyebrow">GESTIÓN DE ACCESOS</p>
-        <h2 id="admin-title">Clientes</h2>
+        <h3>Clientes</h3>
         <p className="form-description">
           Consulta perfiles y administra el acceso al portal de clientes.
         </p>
@@ -830,8 +879,37 @@ function AdminDashboard({
           La asignación del rol Administrador se realiza de forma segura desde
           Supabase.
         </p>
-      </div>
+        </div>
+      )}
     </section>
+  )
+}
+
+function DashboardNavigation<T extends string>({
+  label,
+  selected,
+  items,
+  onSelect,
+}: {
+  label: string
+  selected: T
+  items: { id: T; label: string }[]
+  onSelect: (section: T) => void
+}) {
+  return (
+    <nav className="dashboard-navigation" aria-label={label}>
+      {items.map((item) => (
+        <button
+          aria-current={selected === item.id ? 'page' : undefined}
+          className={selected === item.id ? 'is-selected' : ''}
+          key={item.id}
+          onClick={() => onSelect(item.id)}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </nav>
   )
 }
 
