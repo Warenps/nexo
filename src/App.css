@@ -154,6 +154,156 @@
   color: #24312c;
 }
 
+.workspace-shell {
+  display: grid;
+  grid-template-columns: 258px minmax(0, 1fr);
+  min-height: 100vh;
+  color: #24312c;
+  background: #f5f6f2;
+}
+
+.workspace-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  padding: 30px 22px 22px;
+  color: #f8f7f4;
+  background:
+    radial-gradient(ellipse at 0 100%, rgba(104, 132, 118, 0.25), transparent 50%),
+    linear-gradient(160deg, #173a36 0%, #102d2b 100%);
+}
+
+.workspace-brand {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  text-decoration: none;
+}
+
+.workspace-role {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 58px;
+  padding: 15px 12px;
+  border: 1px solid rgba(216, 227, 206, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.workspace-role-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 11px;
+  color: #173a36;
+  background: #d8e3ce;
+  font-weight: 700;
+}
+
+.workspace-role > div {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-role strong {
+  color: #f7f5ed;
+  font-size: 12px;
+}
+
+.workspace-role > div > span,
+.workspace-sidebar-note,
+.workspace-sidebar-footer {
+  color: #bdc9bf;
+  font-size: 11px;
+}
+
+.workspace-sidebar-note {
+  margin: 18px 4px;
+  line-height: 1.65;
+}
+
+.workspace-sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 14px 4px 0;
+  border-top: 1px solid rgba(216, 227, 206, 0.14);
+}
+
+.workspace-sidebar-footer .status-dot {
+  flex: 0 0 auto;
+}
+
+.workspace-main {
+  min-width: 0;
+}
+
+.workspace-topbar {
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px clamp(24px, 4vw, 56px);
+  border-bottom: 1px solid #e8ebe5;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.workspace-topbar .eyebrow {
+  margin-bottom: 5px;
+  font-size: 10px;
+}
+
+.workspace-content {
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: 38px clamp(24px, 4vw, 56px) 56px;
+}
+
+.workspace-content .dashboard {
+  max-width: 1280px;
+}
+
+.workspace-content .dashboard > .eyebrow {
+  margin-bottom: 10px;
+}
+
+.workspace-content .dashboard > h2 {
+  margin: 0;
+  color: #20332d;
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 600;
+  letter-spacing: -1.2px;
+}
+
+.workspace-state {
+  margin-top: 12vh;
+  padding: 36px;
+  border: 1px solid #e8ebe5;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(35, 72, 60, 0.05);
+}
+
+.workspace-state .primary-button {
+  max-width: 320px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
 .auth-card {
   width: min(100%, 480px);
   margin: auto 0;
@@ -1222,6 +1372,15 @@
     grid-template-columns: minmax(290px, 0.78fr) minmax(390px, 1.22fr);
   }
 
+  .workspace-shell {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .workspace-sidebar {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
   .auth-shell-admin {
     grid-template-columns: minmax(290px, 0.78fr) minmax(390px, 1.22fr);
   }
@@ -1275,6 +1434,69 @@
 }
 
 @media (max-width: 640px) {
+  .workspace-shell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace-sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 13px 20px;
+  }
+
+  .workspace-brand {
+    gap: 8px;
+    font-size: 21px;
+  }
+
+  .workspace-brand .brand-mark {
+    width: 31px;
+    height: 31px;
+    font-size: 20px;
+  }
+
+  .workspace-role {
+    gap: 8px;
+    margin: 0;
+    padding: 7px;
+    border: 0;
+    background: transparent;
+  }
+
+  .workspace-role-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .workspace-sidebar-note,
+  .workspace-sidebar-footer {
+    display: none;
+  }
+
+  .workspace-topbar {
+    min-height: 68px;
+    padding: 12px 20px;
+  }
+
+  .workspace-topbar .sign-out-button {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .workspace-content {
+    padding: 26px 20px 40px;
+  }
+
+  .workspace-state {
+    margin-top: 7vh;
+    padding: 24px 18px;
+  }
+
   .auth-shell {
     display: flex;
     flex-direction: column;

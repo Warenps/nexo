@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { FunctionsHttpError, type User } from '@supabase/supabase-js'
 import { AdminInventory, ClientStore } from './components/Inventory'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
@@ -355,7 +355,6 @@ function App() {
   const currentProfile =
     user && profile?.id === user.id ? profile : null
   const profileLoading = Boolean(user && !currentProfile && !errorMessage)
-  const profileReady = Boolean(currentProfile?.is_active)
   const portalMismatch = Boolean(
     currentProfile && portal && currentProfile.role !== portal,
   )
@@ -370,10 +369,142 @@ function App() {
       !clientListError,
   )
 
+  if (user) {
+    if (profileLoading) {
+      return (
+        <WorkspaceLayout
+          email={user.email ?? ''}
+          role={portal ?? 'client'}
+          onSignOut={handleSignOut}
+        >
+          <div className="state-card workspace-state" role="status">
+            <span className="loading-indicator" aria-hidden="true" />
+            <h2>Verificando tu acceso…</h2>
+            <p className="form-description">
+              Estamos comprobando tu perfil y tus permisos.
+            </p>
+          </div>
+        </WorkspaceLayout>
+      )
+    }
+
+    if (!currentProfile) {
+      return (
+        <WorkspaceLayout
+          email={user.email ?? ''}
+          role={portal ?? 'client'}
+          onSignOut={handleSignOut}
+        >
+          <div className="state-card workspace-state">
+            <p className="eyebrow">NO SE PUDO VALIDAR EL ACCESO</p>
+            <h2>Revisa tu cuenta</h2>
+            <Feedback kind="error">
+              {errorMessage || 'No encontramos el perfil de esta cuenta.'}
+            </Feedback>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={handleSignOut}
+              disabled={busy}
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </WorkspaceLayout>
+      )
+    }
+
+    if (!currentProfile.is_active) {
+      return (
+        <WorkspaceLayout
+          email={user.email ?? ''}
+          role={currentProfile.role}
+          onSignOut={handleSignOut}
+        >
+          <div className="state-card workspace-state">
+            <p className="eyebrow">CUENTA DESACTIVADA</p>
+            <h2>Acceso pausado</h2>
+            <p className="form-description">
+              Esta cuenta fue desactivada. Contacta al administrador si
+              necesitas recuperar el acceso.
+            </p>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={handleSignOut}
+              disabled={busy}
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </WorkspaceLayout>
+      )
+    }
+
+    if (portalMismatch) {
+      return (
+        <WorkspaceLayout
+          email={user.email ?? ''}
+          role={currentProfile.role}
+          onSignOut={handleSignOut}
+        >
+          <div className="state-card workspace-state">
+            <p className="eyebrow">PORTAL INCORRECTO</p>
+            <h2>Este acceso no corresponde a tu rol</h2>
+            <p className="form-description">
+              Esta cuenta tiene el rol de{' '}
+              <strong>
+                {currentProfile.role === 'admin' ? 'administrador' : 'cliente'}
+              </strong>
+              . Cierra sesión para elegir el portal correcto.
+            </p>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={handleSignOut}
+              disabled={busy}
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </WorkspaceLayout>
+      )
+    }
+
+    return (
+      <WorkspaceLayout
+        email={user.email ?? ''}
+        role={currentProfile.role}
+        onSignOut={handleSignOut}
+      >
+        {currentProfile.role === 'client' ? (
+          <ClientDashboard
+            email={user.email ?? ''}
+            profile={currentProfile}
+            clientId={currentProfile.id}
+            profileName={profileName}
+            setProfileName={setProfileName}
+            busy={busy}
+            errorMessage={errorMessage}
+            notice={notice}
+            onSave={saveClientProfile}
+          />
+        ) : (
+          <AdminDashboard
+            clients={clients}
+            isLoading={clientsLoading}
+            busyClientId={busyClientId}
+            errorMessage={clientListError || errorMessage}
+            notice={notice}
+            onChangeStatus={changeClientStatus}
+          />
+        )}
+      </WorkspaceLayout>
+    )
+  }
+
   return (
-    <main
-      className={`auth-shell${signedIn && currentProfile?.role === 'admin' ? ' auth-shell-admin' : ''}`}
-    >
+    <main className="auth-shell">
       <section className="brand-panel" aria-label="Acerca de Nexo">
         <a className="brand" href="/" aria-label="Nexo, inicio">
           <span className="brand-mark" aria-hidden="true">
@@ -404,9 +535,7 @@ function App() {
           <span>nexo</span>
         </div>
 
-        <div
-          className={`auth-card${signedIn && currentProfile?.role === 'admin' ? ' auth-card-wide' : ''}`}
-        >
+        <div className="auth-card">
           {!signedIn && !portal ? (
             <PortalChooser onSelect={selectPortal} />
           ) : null}
@@ -526,106 +655,6 @@ function App() {
             </section>
           ) : null}
 
-          {signedIn && profileLoading ? (
-            <div className="state-card" role="status">
-              <span className="loading-indicator" aria-hidden="true" />
-              <h2>Verificando tu acceso…</h2>
-              <p className="form-description">
-                Estamos comprobando tu perfil y tus permisos.
-              </p>
-            </div>
-          ) : null}
-
-          {signedIn && !profileLoading && errorMessage && !profile ? (
-            <div className="state-card">
-              <p className="eyebrow">NO SE PUDO VALIDAR EL ACCESO</p>
-              <h2>Revisa tu cuenta</h2>
-              <Feedback kind="error">{errorMessage}</Feedback>
-              <button
-                className="primary-button"
-                type="button"
-                onClick={handleSignOut}
-                disabled={busy}
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          ) : null}
-
-          {signedIn && currentProfile && !currentProfile.is_active ? (
-            <div className="state-card">
-              <p className="eyebrow">CUENTA DESACTIVADA</p>
-              <h2>Acceso pausado</h2>
-              <p className="form-description">
-                Esta cuenta fue desactivada. Contacta al administrador si
-                necesitas recuperar el acceso.
-              </p>
-              <button
-                className="primary-button"
-                type="button"
-                onClick={handleSignOut}
-                disabled={busy}
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          ) : null}
-
-          {signedIn && profileReady && portalMismatch ? (
-            <div className="state-card">
-              <p className="eyebrow">PORTAL INCORRECTO</p>
-              <h2>Este acceso no corresponde a tu rol</h2>
-              <p className="form-description">
-                Esta cuenta tiene el rol de{' '}
-                <strong>
-                  {currentProfile?.role === 'admin' ? 'administrador' : 'cliente'}
-                </strong>
-                . Cierra sesión para elegir el portal correcto.
-              </p>
-              <button
-                className="primary-button"
-                type="button"
-                onClick={handleSignOut}
-                disabled={busy}
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          ) : null}
-
-          {signedIn &&
-          profileReady &&
-          !portalMismatch &&
-          currentProfile?.role === 'client' ? (
-            <ClientDashboard
-              user={user}
-              profile={currentProfile}
-              clientId={currentProfile.id}
-              profileName={profileName}
-              setProfileName={setProfileName}
-              busy={busy}
-              errorMessage={errorMessage}
-              notice={notice}
-              onSave={saveClientProfile}
-              onSignOut={handleSignOut}
-            />
-          ) : null}
-
-          {signedIn &&
-          profileReady &&
-          !portalMismatch &&
-          currentProfile?.role === 'admin' ? (
-            <AdminDashboard
-              email={user?.email ?? ''}
-              clients={clients}
-              isLoading={clientsLoading}
-              busyClientId={busyClientId}
-              errorMessage={clientListError || errorMessage}
-              notice={notice}
-              onChangeStatus={changeClientStatus}
-              onSignOut={handleSignOut}
-            />
-          ) : null}
         </div>
 
         <footer className="form-footer">
@@ -685,7 +714,7 @@ function PortalChooser({ onSelect }: { onSelect: (role: AppRole) => void }) {
 }
 
 function ClientDashboard({
-  user,
+  email,
   profile,
   clientId,
   profileName,
@@ -694,9 +723,8 @@ function ClientDashboard({
   errorMessage,
   notice,
   onSave,
-  onSignOut,
 }: {
-  user: User | null
+  email: string
   profile: Profile
   clientId: string
   profileName: string
@@ -705,18 +733,12 @@ function ClientDashboard({
   errorMessage: string
   notice: string
   onSave: (event: FormEvent<HTMLFormElement>) => void
-  onSignOut: () => void
 }) {
   const [section, setSection] = useState<ClientSection>('catalog')
   const [cartCount, setCartCount] = useState(0)
 
   return (
     <section className="dashboard" aria-labelledby="client-title">
-      <DashboardHeader
-        eyebrow="PORTAL DE CLIENTES"
-        email={user?.email ?? ''}
-        onSignOut={onSignOut}
-      />
       <p className="eyebrow">HOLA, {profile.display_name || 'CLIENTE'}</p>
       <h2 id="client-title">Tu espacio de compras</h2>
       <DashboardNavigation
@@ -754,7 +776,7 @@ function ClientDashboard({
             </label>
             <label className="field">
               <span>Correo electrónico</span>
-              <input type="email" value={user?.email ?? ''} readOnly />
+              <input type="email" value={email} readOnly />
             </label>
             {errorMessage && <Feedback kind="error">{errorMessage}</Feedback>}
             {notice && <Feedback kind="success">{notice}</Feedback>}
@@ -775,33 +797,24 @@ function ClientDashboard({
 }
 
 function AdminDashboard({
-  email,
   clients,
   isLoading,
   busyClientId,
   errorMessage,
   notice,
   onChangeStatus,
-  onSignOut,
 }: {
-  email: string
   clients: ManagedClient[]
   isLoading: boolean
   busyClientId: string
   errorMessage: string
   notice: string
   onChangeStatus: (client: ManagedClient) => void
-  onSignOut: () => void
 }) {
   const [section, setSection] = useState<AdminSection>('overview')
 
   return (
     <section className="dashboard admin-dashboard" aria-labelledby="admin-title">
-      <DashboardHeader
-        eyebrow="PORTAL DE ADMINISTRACIÓN"
-        email={email}
-        onSignOut={onSignOut}
-      />
       <p className="eyebrow">CENTRO DE CONTROL</p>
       <h2 id="admin-title">Panel de administración</h2>
       <DashboardNavigation
@@ -913,25 +926,61 @@ function DashboardNavigation<T extends string>({
   )
 }
 
-function DashboardHeader({
-  eyebrow,
+function WorkspaceLayout({
   email,
+  role,
+  children,
   onSignOut,
 }: {
-  eyebrow: string
   email: string
+  role: AppRole
+  children: ReactNode
   onSignOut: () => void
 }) {
   return (
-    <header className="dashboard-header">
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <span className="dashboard-email">{email}</span>
-      </div>
-      <button className="sign-out-button" type="button" onClick={onSignOut}>
-        Salir
-      </button>
-    </header>
+    <main className="workspace-shell">
+      <aside className="workspace-sidebar">
+        <a className="workspace-brand" href="/" aria-label="Nexo">
+          <span className="brand-mark" aria-hidden="true">n</span>
+          <span>nexo</span>
+        </a>
+        <div className="workspace-role">
+          <span className="workspace-role-icon" aria-hidden="true">
+            {role === 'admin' ? 'A' : 'C'}
+          </span>
+          <div>
+            <strong>
+              {role === 'admin' ? 'Administración' : 'Portal de cliente'}
+            </strong>
+            <span>Sesión activa</span>
+          </div>
+        </div>
+        <div className="workspace-sidebar-note">
+          {role === 'admin'
+            ? 'Gestiona productos, existencias y accesos desde un solo lugar.'
+            : 'Explora el catálogo, organiza tu carrito y consulta tus compras.'}
+        </div>
+        <div className="workspace-sidebar-footer">
+          <span className="status-dot" aria-hidden="true" />
+          <span>Conexión segura</span>
+        </div>
+      </aside>
+
+      <section className="workspace-main">
+        <header className="workspace-topbar">
+          <div>
+            <p className="eyebrow">
+              {role === 'admin' ? 'PANEL DE ADMINISTRACIÓN' : 'TIENDA NEXO'}
+            </p>
+            <span className="dashboard-email">{email}</span>
+          </div>
+          <button className="sign-out-button" type="button" onClick={onSignOut}>
+            Cerrar sesión
+          </button>
+        </header>
+        <div className="workspace-content">{children}</div>
+      </section>
+    </main>
   )
 }
 
