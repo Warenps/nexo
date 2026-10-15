@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { FunctionsHttpError, type User } from '@supabase/supabase-js'
+import { AdminInventory, ClientStore } from './components/Inventory'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import './App.css'
 
@@ -368,7 +369,9 @@ function App() {
   )
 
   return (
-    <main className="auth-shell">
+    <main
+      className={`auth-shell${signedIn && currentProfile?.role === 'admin' ? ' auth-shell-admin' : ''}`}
+    >
       <section className="brand-panel" aria-label="Acerca de Nexo">
         <a className="brand" href="/" aria-label="Nexo, inicio">
           <span className="brand-mark" aria-hidden="true">
@@ -399,7 +402,9 @@ function App() {
           <span>nexo</span>
         </div>
 
-        <div className="auth-card">
+        <div
+          className={`auth-card${signedIn && currentProfile?.role === 'admin' ? ' auth-card-wide' : ''}`}
+        >
           {!signedIn && !portal ? (
             <PortalChooser onSelect={selectPortal} />
           ) : null}
@@ -593,6 +598,7 @@ function App() {
             <ClientDashboard
               user={user}
               profile={currentProfile}
+              clientId={currentProfile.id}
               profileName={profileName}
               setProfileName={setProfileName}
               busy={busy}
@@ -679,6 +685,7 @@ function PortalChooser({ onSelect }: { onSelect: (role: AppRole) => void }) {
 function ClientDashboard({
   user,
   profile,
+  clientId,
   profileName,
   setProfileName,
   busy,
@@ -689,6 +696,7 @@ function ClientDashboard({
 }: {
   user: User | null
   profile: Profile
+  clientId: string
   profileName: string
   setProfileName: (name: string) => void
   busy: boolean
@@ -738,6 +746,7 @@ function ClientDashboard({
           {busy ? 'Guardando…' : 'Guardar perfil'}
         </button>
       </form>
+      <ClientStore clientId={clientId} />
     </section>
   )
 }
@@ -768,57 +777,60 @@ function AdminDashboard({
         email={email}
         onSignOut={onSignOut}
       />
-      <p className="eyebrow">GESTIÓN DE ACCESOS</p>
-      <h2 id="admin-title">Clientes</h2>
-      <p className="form-description">
-        Consulta perfiles y administra el acceso al portal de clientes.
-      </p>
-      {errorMessage && <Feedback kind="error">{errorMessage}</Feedback>}
-      {notice && <Feedback kind="success">{notice}</Feedback>}
-      {isLoading ? (
-        <p className="table-message" role="status">
-          Cargando clientes…
+      <AdminInventory />
+      <div className="admin-clients-section">
+        <p className="eyebrow">GESTIÓN DE ACCESOS</p>
+        <h2 id="admin-title">Clientes</h2>
+        <p className="form-description">
+          Consulta perfiles y administra el acceso al portal de clientes.
         </p>
-      ) : clients.length === 0 ? (
-        <p className="table-message">Todavía no hay clientes registrados.</p>
-      ) : (
-        <div className="client-list" role="list" aria-label="Lista de clientes">
-          {clients.map((client) => (
-            <article className="client-row" key={client.id} role="listitem">
-              <div className="client-avatar" aria-hidden="true">
-                {(client.display_name || client.email || 'C')
-                  .charAt(0)
-                  .toUpperCase()}
-              </div>
-              <div className="client-info">
-                <strong>{client.display_name || 'Sin nombre'}</strong>
-                <span>{client.email}</span>
-                <span
-                  className={`account-status ${client.is_active ? 'is-active' : 'is-inactive'}`}
+        {errorMessage && <Feedback kind="error">{errorMessage}</Feedback>}
+        {notice && <Feedback kind="success">{notice}</Feedback>}
+        {isLoading ? (
+          <p className="table-message" role="status">
+            Cargando clientes…
+          </p>
+        ) : clients.length === 0 ? (
+          <p className="table-message">Todavía no hay clientes registrados.</p>
+        ) : (
+          <div className="client-list" role="list" aria-label="Lista de clientes">
+            {clients.map((client) => (
+              <article className="client-row" key={client.id} role="listitem">
+                <div className="client-avatar" aria-hidden="true">
+                  {(client.display_name || client.email || 'C')
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
+                <div className="client-info">
+                  <strong>{client.display_name || 'Sin nombre'}</strong>
+                  <span>{client.email}</span>
+                  <span
+                    className={`account-status ${client.is_active ? 'is-active' : 'is-inactive'}`}
+                  >
+                    {client.is_active ? 'Activa' : 'Desactivada'}
+                  </span>
+                </div>
+                <button
+                  className={`status-button ${client.is_active ? 'deactivate-button' : 'activate-button'}`}
+                  type="button"
+                  onClick={() => onChangeStatus(client)}
+                  disabled={Boolean(busyClientId)}
                 >
-                  {client.is_active ? 'Activa' : 'Desactivada'}
-                </span>
-              </div>
-              <button
-                className={`status-button ${client.is_active ? 'deactivate-button' : 'activate-button'}`}
-                type="button"
-                onClick={() => onChangeStatus(client)}
-                disabled={Boolean(busyClientId)}
-              >
-                {busyClientId === client.id
-                  ? 'Actualizando…'
-                  : client.is_active
-                    ? 'Desactivar'
-                    : 'Activar'}
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
-      <p className="admin-note">
-        La asignación del rol Administrador se realiza de forma segura desde
-        Supabase.
-      </p>
+                  {busyClientId === client.id
+                    ? 'Actualizando…'
+                    : client.is_active
+                      ? 'Desactivar'
+                      : 'Activar'}
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+        <p className="admin-note">
+          La asignación del rol Administrador se realiza de forma segura desde
+          Supabase.
+        </p>
+      </div>
     </section>
   )
 }

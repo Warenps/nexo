@@ -57,6 +57,24 @@ El registro público crea perfiles con el rol `client` mediante un trigger de Po
 
 No existe registro público de administradores ni un botón para otorgar roles en la aplicación. Solo un operador con permisos de Supabase debe ejecutar este paso.
 
+## Inventario y compras
+
+La migración `supabase/migrations/20261015000000_inventory_and_orders.sql` agrega:
+
+- `products`: catálogo, precios, existencia y mínimo de stock. Los productos se desactivan en vez de borrarse para preservar el historial.
+- `inventory_movements`: bitácora de entradas, salidas administrativas y ventas.
+- `orders` y `order_items`: compras y precios/nombres guardados como estaban al momento de la venta.
+
+El panel de administración permite crear y actualizar productos, activar u ocultar productos y registrar entradas/salidas con motivo. El cliente solo consulta productos activos con existencia, compra unidades y ve sus propias compras. Los pedidos y movimientos no se pueden insertar o modificar directamente desde el navegador: las funciones `create_product`, `adjust_inventory` y `place_order` validan permisos y actualizan stock dentro de una transacción. Las compras con stock insuficiente se rechazan sin crear un pedido parcial.
+
+Aplica la nueva migración junto con las migraciones pendientes:
+
+```sh
+supabase db push
+```
+
+Si quieres revisar el SQL antes de aplicarlo, abre `supabase/migrations/20261015000000_inventory_and_orders.sql` en el editor de Supabase. No se necesita una clave `service_role` en el frontend.
+
 ## Edge Function de administración
 
 `supabase/functions/manage-users/index.ts` lista perfiles de clientes y activa/desactiva sus cuentas. Antes de cada acción la función valida el token del usuario, consulta su rol y requiere un perfil `admin` activo. Usa la API administrativa de Supabase únicamente en el backend.
@@ -85,6 +103,8 @@ La pantalla inicial ofrece dos accesos:
 - **Cliente:** permite iniciar sesión o registrarse. El registro público siempre crea un cliente.
 
 Después de verificar el rol, el panel Cliente permite editar el nombre para mostrar. El panel Admin muestra la lista de clientes y permite activar o desactivar cuentas.
+
+El panel Admin también administra el catálogo y el inventario. En el panel Cliente se muestran el catálogo disponible y las últimas diez compras; comprar registra de inmediato el pedido y descuenta una unidad del stock, sin cobro en línea.
 
 ## Compilar
 
